@@ -47,6 +47,7 @@ private val navy = Color(0xFF070E1B)
 private val panel = Color(0xFF122338)
 
 class MainActivity : ComponentActivity() {
+    private lateinit var conversationEngine: ConversationEngine
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ready = false
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
     private fun runCommand(command: String): String {
         val c = command.trim().lowercase(Locale.ITALIAN)
         if (c.isBlank()) return "Inserisci un comando."
+        conversationEngine.answer(command)?.let { return it }
         if (c.contains("ciao") || c.contains("buongiorno") || c.contains("buonasera")) return "Ciao! Sono Lira. Come posso aiutarti?"
         if (c.contains("come stai")) return "Sono pronta ad aiutarti."
         if (c.contains("chi sei") || c.contains("come ti chiami")) return "Sono Lira, il tuo assistente Android."
@@ -98,11 +100,12 @@ class MainActivity : ComponentActivity() {
         if (c.contains("data") || c.contains("giorno")) {
             return "Oggi è " + SimpleDateFormat("EEEE d MMMM yyyy", Locale.ITALIAN).format(Date())
         }
-        return "Comando ricevuto. Questa funzione sarà disponibile con i prossimi moduli di LIRA."
+        return "Non ho ancora una risposta per questa richiesta. Posso aiutarti con i comandi del telefono e alcune domande semplici; le conversazioni AI libere richiedono un modello aggiuntivo."
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        conversationEngine = ConversationEngine(this)
         val prefs = getSharedPreferences("lira_voice", Context.MODE_PRIVATE)
         voiceEnabled = prefs.getBoolean("enabled", true)
         voiceRate = prefs.getFloat("rate", 1.05f)
@@ -287,9 +290,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Spacer(Modifier.height(20.dp))
-                        Text("COMANDI DISPONIBILI", fontSize = 11.sp, color = Color(0xFF9CB8CE))
+                        Text("COMANDI E CONVERSAZIONE OFFLINE", fontSize = 11.sp, color = Color(0xFF9CB8CE))
                         Spacer(Modifier.height(10.dp))
-                        listOf("Apri impostazioni", "Apri Wi-Fi", "Apri Bluetooth", "Che ore sono?", "Che giorno è oggi?").forEach { example ->
+                        listOf("Apri impostazioni", "Apri Wi-Fi", "Che ore sono?", "Chiamami Melo", "Come mi chiamo?", "Cosa ricordi di me?").forEach { example ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
                                     command = example

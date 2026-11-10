@@ -151,19 +151,43 @@ class MainActivity : ComponentActivity() {
                     }
                 } catch (_: Exception) {}
             }
-            fun submit(text: String) {
-                val answer = runCommand(text)
+            fun saveExchange(question: String, answer: String) {
                 response = answer
-                if (text.isNotBlank()) {
-                    history.add(0, text.trim() to answer)
-                    if (history.size > 50) history.removeAt(history.lastIndex)
-                    val saved = JSONArray()
-                    history.forEach { (q, a) ->
-                        saved.put(JSONObject().put("question", q).put("answer", a))
-                    }
-                    prefs.edit().putString("history", saved.toString()).apply()
+                history.add(0, question.trim() to answer)
+                if (history.size > 50) history.removeAt(history.lastIndex)
+                val saved = JSONArray()
+                history.forEach { (q, a) ->
+                    saved.put(JSONObject().put("question", q).put("answer", a))
                 }
+                prefs.edit().putString("history", saved.toString()).apply()
                 speak(answer)
+            }
+            fun submit(text: String) {
+                if (text.isBlank() || aiBusy) return
+                val answer = runCommand(text)
+                val fallback = answer.startsWith("Non ho ancora una risposta per questa richiesta.")
+                if (!aiEnabled || !fallback) {
+                    saveExchange(text, answer)
+                    return
+                }
+                val context = history.take(6).reversed().flatMap { (q, a) ->
+                    listOf("user" to q, "assistant" to a)
+                } + ("user" to text.trim())
+                val endpoint = aiEndpoint
+                val model = aiModel
+                aiBusy = true
+                response = "LIRA sta elaborando la risposta..."
+                Thread {
+                    val result = try {
+                        LocalAiClient().chat(endpoint, model, context)
+                    } catch (e: Exception) {
+                        "Impossibile contattare il modello AI: ${e.message ?: "errore sconosciuto"}. Verifica indirizzo e server Ollama."
+                    }
+                    runOnUiThread {
+                        aiBusy = false
+                        saveExchange(text, result)
+                    }
+                }.start()
             }
             var listening by remember { mutableStateOf(false) }
             val speechPermission = rememberLauncherForActivityResult(

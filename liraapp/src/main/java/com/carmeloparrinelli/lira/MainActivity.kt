@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private var voiceRate = 1.05f
     private var voicePitch = 0.95f
     private var selectedVoiceName: String? = null
+    private var selectedEngine: String? = null
     private fun speak(message: String) {
         if (voiceEnabled && ready) {
             tts?.setSpeechRate(voiceRate)
@@ -107,13 +108,14 @@ class MainActivity : ComponentActivity() {
         voiceRate = prefs.getFloat("rate", 1.05f)
         voicePitch = prefs.getFloat("pitch", 0.95f)
         selectedVoiceName = prefs.getString("voice_name", null)
-        tts = TextToSpeech(this) { status ->
+        selectedEngine = prefs.getString("tts_engine", null)
+        tts = TextToSpeech(this, { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale.ITALIAN)
                 ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
                 selectedVoiceName?.let { name -> tts?.voices?.firstOrNull { it.name == name }?.let { tts?.voice = it } }
             }
-        }
+        }, selectedEngine)
         setContent {
             var command by remember { mutableStateOf("") }
             var response by remember { mutableStateOf("Sistema pronto. Puoi scrivere o dettare un comando.") }
@@ -123,9 +125,12 @@ class MainActivity : ComponentActivity() {
             var pitch by remember { mutableFloatStateOf(voicePitch) }
             var voiceName by remember { mutableStateOf(selectedVoiceName ?: "") }
             var voiceMenu by remember { mutableStateOf(false) }
+            var engineMenu by remember { mutableStateOf(false) }
+            var engines by remember { mutableStateOf<List<TextToSpeech.EngineInfo>>(emptyList()) }
             var voices by remember { mutableStateOf<List<android.speech.tts.Voice>>(emptyList()) }
             LaunchedEffect(selectedTab) {
                 if (selectedTab == 2) {
+                    engines = tts?.engines ?: emptyList()
                     voices = tts?.voices?.filter { it.locale.language == "it" }?.sortedBy { it.name } ?: emptyList()
                 }
             }
@@ -338,6 +343,31 @@ class MainActivity : ComponentActivity() {
                                 voicePitch = it
                                 prefs.edit().putFloat("pitch", it).apply()
                             }, valueRange = 0.75f..1.25f)
+                            Spacer(Modifier.height(12.dp))
+                            Text("Motore vocale Android", color = Color.White)
+                            Box {
+                                OutlinedButton(onClick = { engineMenu = true }) {
+                                    Text(selectedEngine ?: "Motore di sistema")
+                                }
+                                DropdownMenu(expanded = engineMenu, onDismissRequest = { engineMenu = false }) {
+                                    engines.forEach { engine ->
+                                        DropdownMenuItem(text = { Text(engine.label) }, onClick = {
+                                            engineMenu = false
+                                            selectedEngine = engine.name
+                                            prefs.edit().putString("tts_engine", engine.name).apply()
+                                            tts?.stop()
+                                            tts?.shutdown()
+                                            ready = false
+                                            tts = TextToSpeech(this@MainActivity, { status ->
+                                                if (status == TextToSpeech.SUCCESS) {
+                                                    val result = tts?.setLanguage(Locale.ITALIAN)
+                                                    ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+                                                }
+                                            }, engine.name)
+                                        })
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
                             Text("Seleziona voce italiana", color = Color.White)
                             Box {

@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.Executors
 
 /**
@@ -35,6 +37,55 @@ class OnDeviceAi(private val context: Context) {
                     bytes
                 } finally {
                     temporary.delete()
+                }
+            }
+            callback(result)
+        }
+    }
+
+    /**
+     * Downloads the public model artifact only when the provider grants access.
+     * Gemma licensing may require explicit acceptance at Hugging Face.
+     */
+    fun downloadModel(url: String, progress: (Int) -> Unit, callback: (Result<Long>) -> Unit) {
+        executor.execute {
+            val result = runCatching {
+                val target = URL(url)
+                require(target.protocol == "https") { "Il download richiede HTTPS." }
+                val connection = target.openConnection() as HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 30000
+                connection.instanceFollowRedirects = true
+                val temp = File(context.filesDir, "lira-model.download")
+                try {
+                    val code = connection.responseCode
+                    check(code == 200) {
+                        if (code == 401 || code == 403) "Accesso al modello non autorizzato. Accetta prima la licenza sul sito del produttore."
+                        else "Download non disponibile: HTTP $code"
+                    }
+                    val length = connection.contentLengthLong
+                    var downloaded = 0L
+                    connection.inputStream.use { input ->
+                        temp.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = input.read(buffer)
+                                if (n < 0) break
+                                output.write(buffer, 0, n)
+                                downloaded += n
+                                if (length > 0) progress((downloaded * 100 / length).toInt().coerceIn(0, 100))
+                            }
+                        }
+                    }
+                    check(downloaded > 100L * 1024 * 1024) { "Download incompleto o file non valido." }
+                    engine?.close()
+                    engine = null
+                    if (modelFile.exists()) modelFile.delete()
+                    check(temp.renameTo(modelFile)) { "Impossibile salvare il modello scaricato." }
+                    downloaded
+                } finally {
+                    temp.delete()
+                    connection.disconnect()
                 }
             }
             callback(result)

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenJarvis"
-include ':app'
+rootProject.name = "Lira"
+include ':liraapp'

@@ -44,10 +44,12 @@ class MainActivity : ComponentActivity() {
     private var tts: TextToSpeech? = null
     private var ready = false
     private var voiceEnabled = true
-    private var voiceRate = 1.0f
+    private var voiceRate = 1.05f
+    private var voicePitch = 0.95f
     private fun speak(message: String) {
         if (voiceEnabled && ready) {
             tts?.setSpeechRate(voiceRate)
+            tts?.setPitch(voicePitch)
             tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "lira")
         }
     }
@@ -92,7 +94,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("lira_voice", Context.MODE_PRIVATE)
         voiceEnabled = prefs.getBoolean("enabled", true)
-        voiceRate = prefs.getFloat("rate", 1.0f)
+        voiceRate = prefs.getFloat("rate", 1.05f)
+        voicePitch = prefs.getFloat("pitch", 0.95f)
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale.ITALIAN)
@@ -105,6 +108,7 @@ class MainActivity : ComponentActivity() {
             var selectedTab by remember { mutableStateOf(0) }
             var voiceOn by remember { mutableStateOf(voiceEnabled) }
             var rate by remember { mutableFloatStateOf(voiceRate) }
+            var pitch by remember { mutableFloatStateOf(voicePitch) }
             val history = remember { mutableStateListOf<Pair<String, String>>() }
             fun submit(text: String) {
                 val answer = runCommand(text)
@@ -247,6 +251,13 @@ class MainActivity : ComponentActivity() {
                                 voiceRate = it
                                 prefs.edit().putFloat("rate", it).apply()
                             }, valueRange = 0.7f..1.4f)
+                            Spacer(Modifier.height(12.dp))
+                            Text("Tonalità della voce", color = Color.White)
+                            Slider(value = pitch, onValueChange = {
+                                pitch = it
+                                voicePitch = it
+                                prefs.edit().putFloat("pitch", it).apply()
+                            }, valueRange = 0.75f..1.25f)
                             OutlinedButton(onClick = { speak("Ciao, sono Lira. Questa è la mia voce.") }) {
                                 Text("PROVA VOCE")
                             }

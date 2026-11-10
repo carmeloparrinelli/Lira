@@ -16,11 +16,11 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Android SDK diagnostics
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
@@ -32,10 +32,10 @@ jobs:
           test -n "$SDKMANAGER" && test -x "$SDKMANAGER"
           "$SDKMANAGER" --version
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-34" "build-tools;34.0.0"
-      - name: Set up Gradle 8.2.1
+      - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.2.1'
+          gradle-version: '8.7'
       - name: Build debug APK
         run: gradle --no-daemon :liraapp:assembleDebug
       - name: Upload debug APK

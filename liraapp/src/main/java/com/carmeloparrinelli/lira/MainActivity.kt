@@ -293,7 +293,7 @@ class MainActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { submit(command) }, modifier = Modifier.weight(1f)) {
+                            Button(onClick = { submit(command) }, enabled = !aiBusy, modifier = Modifier.weight(1f)) {
                                 Text("ESEGUI")
                             }
                             OutlinedButton(onClick = {
@@ -349,6 +349,32 @@ class MainActivity : ComponentActivity() {
                             }
                         } else {
                             Spacer(Modifier.height(24.dp))
+                            Text("INTELLIGENZA ARTIFICIALE", color = cyan, fontSize = 18.sp)
+                            Spacer(Modifier.height(12.dp))
+                            Text("Collegamento opzionale a Ollama sulla rete Wi-Fi. Richiede un server acceso e un modello installato. Nessuna chiave API. Il modello non gira ancora sul telefono.", color = Color.LightGray, fontSize = 13.sp)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Abilita AI in rete locale", modifier = Modifier.weight(1f), color = Color.White)
+                                Switch(checked = aiEnabled, onCheckedChange = {
+                                    aiEnabled = it
+                                    prefs.edit().putBoolean("ai_enabled", it).apply()
+                                })
+                            }
+                            OutlinedTextField(value = aiEndpoint, onValueChange = {
+                                aiEndpoint = it
+                                prefs.edit().putString("ai_endpoint", it).apply()
+                            }, label = { Text("Indirizzo server Ollama") },
+                                placeholder = { Text("http://192.168.1.2:11434") },
+                                singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(value = aiModel, onValueChange = {
+                                aiModel = it
+                                prefs.edit().putString("ai_model", it).apply()
+                            }, label = { Text("Modello installato") },
+                                placeholder = { Text("gemma3:1b") },
+                                singleLine = true, modifier = Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(20.dp))
+                            Divider(color = Color(0xFF26415C))
+                            Spacer(Modifier.height(20.dp))
                             Text("IMPOSTAZIONI VOCALI", color = cyan, fontSize = 18.sp)
                             Spacer(Modifier.height(16.dp))
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -48,6 +48,7 @@ private val panel = Color(0xFF122338)
 
 class MainActivity : ComponentActivity() {
     private lateinit var conversationEngine: ConversationEngine
+    private lateinit var onDeviceAi: OnDeviceAi
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ready = false
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
         speechRecognizer = null
         tts?.stop()
         tts?.shutdown()
+        if (::onDeviceAi.isInitialized) onDeviceAi.shutdown()
         super.onDestroy()
     }
 
@@ -106,6 +108,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         conversationEngine = ConversationEngine(this)
+        onDeviceAi = OnDeviceAi(this)
         val prefs = getSharedPreferences("lira_voice", Context.MODE_PRIVATE)
         voiceEnabled = prefs.getBoolean("enabled", true)
         voiceRate = prefs.getFloat("rate", 1.05f)
@@ -120,6 +123,9 @@ class MainActivity : ComponentActivity() {
             }
         }, selectedEngine)
         setContent {
+            var offlineAiEnabled by remember { mutableStateOf(prefs.getBoolean("offline_ai_enabled", false)) }
+            var offlineModelReady by remember { mutableStateOf(onDeviceAi.hasModel()) }
+            var offlineImportStatus by remember { mutableStateOf("") }
             var aiEnabled by remember { mutableStateOf(prefs.getBoolean("ai_enabled", false)) }
             var aiEndpoint by remember { mutableStateOf(prefs.getString("ai_endpoint", "http://192.168.1.2:11434") ?: "") }
             var aiModel by remember { mutableStateOf(prefs.getString("ai_model", "gemma3:1b") ?: "") }
@@ -139,6 +145,22 @@ class MainActivity : ComponentActivity() {
                 if (selectedTab == 2) {
                     engines = tts?.engines ?: emptyList()
                     voices = tts?.voices?.filter { it.locale.language == "it" }?.sortedBy { it.name } ?: emptyList()
+                }
+            }
+            val modelPicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri != null) {
+                    offlineImportStatus = "Importazione modello in corso..."
+                    onDeviceAi.importModel(uri) { result ->
+                        runOnUiThread {
+                            offlineModelReady = result.isSuccess
+                            offlineImportStatus = result.fold(
+                                { "Modello importato: ${it / (1024 * 1024)} MB" },
+                                { "Importazione fallita: ${it.message}" }
+                            )
+                        }
+                    }
                 }
             }
             val history = remember { mutableStateListOf<Pair<String, String>>() }

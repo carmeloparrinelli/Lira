@@ -188,6 +188,21 @@ class MainActivity : ComponentActivity() {
                 if (text.isBlank() || aiBusy) return
                 val answer = runCommand(text)
                 val fallback = answer.startsWith("Non ho ancora una risposta per questa richiesta.")
+                if (fallback && offlineAiEnabled) {
+                    if (!offlineModelReady) {
+                        response = "Importa un modello .task dalle impostazioni AI offline."
+                        return
+                    }
+                    aiBusy = true
+                    response = "LIRA sta elaborando sul telefono..."
+                    onDeviceAi.generate(text) { result ->
+                        runOnUiThread {
+                            aiBusy = false
+                            saveExchange(text, result.getOrElse { "Errore AI offline: ${it.message}" })
+                        }
+                    }
+                    return
+                }
                 if (!aiEnabled || !fallback) {
                     saveExchange(text, answer)
                     return
@@ -371,6 +386,24 @@ class MainActivity : ComponentActivity() {
                             }
                         } else {
                             Spacer(Modifier.height(24.dp))
+                            Text("AI DIRETTAMENTE SUL TELEFONO", color = cyan, fontSize = 18.sp)
+                            Spacer(Modifier.height(10.dp))
+                            Text("Importa un modello MediaPipe LLM compatibile in formato .task. Il modello viene salvato sul telefono e le risposte vengono generate offline. Il primo avvio può richiedere tempo e memoria.", color = Color.LightGray, fontSize = 13.sp)
+                            Text(if (offlineModelReady) "Modello locale presente" else "Nessun modello locale importato", color = if (offlineModelReady) cyan else Color.LightGray)
+                            OutlinedButton(onClick = {
+                                modelPicker.launch(arrayOf("application/octet-stream", "*/*"))
+                            }) { Text("IMPORTA MODELLO .TASK") }
+                            if (offlineImportStatus.isNotBlank()) Text(offlineImportStatus, color = Color.LightGray)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Usa AI offline", modifier = Modifier.weight(1f), color = Color.White)
+                                Switch(checked = offlineAiEnabled, onCheckedChange = {
+                                    offlineAiEnabled = it
+                                    prefs.edit().putBoolean("offline_ai_enabled", it).apply()
+                                })
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Divider(color = Color(0xFF26415C))
+                            Spacer(Modifier.height(16.dp))
                             Text("INTELLIGENZA ARTIFICIALE", color = cyan, fontSize = 18.sp)
                             Spacer(Modifier.height(12.dp))
                             Text("Collegamento opzionale a Ollama sulla rete Wi-Fi. Richiede un server acceso e un modello installato. Nessuna chiave API. Il modello non gira ancora sul telefono.", color = Color.LightGray, fontSize = 13.sp)

@@ -105,9 +105,13 @@ class OnDeviceAi(private val context: Context) {
                     engine = LlmInference.createFromOptions(context, options)
                 }
                 val answer = engine!!.generateResponse(
-                    "Sei LIRA, un'assistente personale. Rispondi in italiano, in modo naturale e conciso.\\nUtente: $prompt\\nLIRA:"
+                    "Sei LIRA, un'assistente personale. Rispondi in italiano, in modo naturale e conciso. Se non conosci una risposta, dillo senza inventare nomi o fatti.\nUtente: $prompt\nLIRA:"
                 )
-                answer.trim().ifEmpty { error("Il modello non ha prodotto una risposta.") }
+                answer.replace("\\n", "\n")
+                    .replace("\\t", " ")
+                    .replace(Regex("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]"), "")
+                    .trim()
+                    .ifEmpty { error("Il modello non ha prodotto una risposta.") }
             }
             callback(result)
         }

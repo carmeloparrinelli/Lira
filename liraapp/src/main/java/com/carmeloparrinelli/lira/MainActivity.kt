@@ -126,6 +126,8 @@ class MainActivity : ComponentActivity() {
             var offlineAiEnabled by remember { mutableStateOf(prefs.getBoolean("offline_ai_enabled", false)) }
             var offlineModelReady by remember { mutableStateOf(onDeviceAi.hasModel()) }
             var offlineImportStatus by remember { mutableStateOf("") }
+            var offlineDownloadProgress by remember { mutableIntStateOf(0) }
+            var offlineDownloading by remember { mutableStateOf(false) }
             var aiEnabled by remember { mutableStateOf(prefs.getBoolean("ai_enabled", false)) }
             var aiEndpoint by remember { mutableStateOf(prefs.getString("ai_endpoint", "http://192.168.1.2:11434") ?: "") }
             var aiModel by remember { mutableStateOf(prefs.getString("ai_model", "gemma3:1b") ?: "") }
@@ -390,6 +392,35 @@ class MainActivity : ComponentActivity() {
                             Spacer(Modifier.height(10.dp))
                             Text("Importa un modello MediaPipe LLM compatibile in formato .task. Il modello viene salvato sul telefono e le risposte vengono generate offline. Il primo avvio può richiedere tempo e memoria.", color = Color.LightGray, fontSize = 13.sp)
                             Text(if (offlineModelReady) "Modello locale presente" else "Nessun modello locale importato", color = if (offlineModelReady) cyan else Color.LightGray)
+                            Text("Modello suggerito: Gemma 3 1B IT (circa 555 MB). Il fornitore richiede di accettare la licenza su Hugging Face prima di consentire il download.", color = Color.LightGray, fontSize = 13.sp)
+                            OutlinedButton(onClick = {
+                                startActivity(Intent(Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://huggingface.co/litert-community/Gemma3-1B-IT")))
+                            }) { Text("LICENZA E ACCESSO AL MODELLO") }
+                            Button(onClick = {
+                                offlineDownloading = true
+                                offlineDownloadProgress = 0
+                                offlineImportStatus = "Download del modello in corso..."
+                                onDeviceAi.downloadModel(
+                                    "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task",
+                                    { percent -> runOnUiThread { offlineDownloadProgress = percent } }
+                                ) { result ->
+                                    runOnUiThread {
+                                        offlineDownloading = false
+                                        offlineModelReady = result.isSuccess
+                                        offlineImportStatus = result.fold(
+                                            { "Modello scaricato: ${it / (1024 * 1024)} MB" },
+                                            { "Download non riuscito: ${it.message}" }
+                                        )
+                                    }
+                                }
+                            }, enabled = !offlineDownloading) {
+                                Text(if (offlineDownloading) "DOWNLOAD IN CORSO" else "SCARICA MODELLO AI")
+                            }
+                            if (offlineDownloading) LinearProgressIndicator(
+                                progress = { offlineDownloadProgress / 100f },
+                                modifier = Modifier.fillMaxWidth()
+                            )
                             OutlinedButton(onClick = {
                                 modelPicker.launch(arrayOf("application/octet-stream", "*/*"))
                             }) { Text("IMPORTA MODELLO .TASK") }

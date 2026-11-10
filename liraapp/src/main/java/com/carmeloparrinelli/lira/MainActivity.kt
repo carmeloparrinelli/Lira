@@ -3,6 +3,8 @@ package com.carmeloparrinelli.lira
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.content.Context
 import android.provider.Settings
 import android.speech.RecognizerIntent
 import androidx.activity.ComponentActivity
@@ -39,9 +41,30 @@ private val navy = Color(0xFF070E1B)
 private val panel = Color(0xFF122338)
 
 class MainActivity : ComponentActivity() {
+    private var tts: TextToSpeech? = null
+    private var ready = false
+    private var voiceEnabled = true
+    private var voiceRate = 1.0f
+    private fun speak(message: String) {
+        if (voiceEnabled && ready) {
+            tts?.setSpeechRate(voiceRate)
+            tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "lira")
+        }
+    }
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
+    }
+
     private fun runCommand(command: String): String {
         val c = command.trim().lowercase(Locale.ITALIAN)
         if (c.isBlank()) return "Inserisci un comando."
+        if (c.contains("ciao") || c.contains("buongiorno") || c.contains("buonasera")) return "Ciao! Sono Lira. Come posso aiutarti?"
+        if (c.contains("come stai")) return "Sono pronta ad aiutarti."
+        if (c.contains("chi sei") || c.contains("come ti chiami")) return "Sono Lira, il tuo assistente Android."
+        if (c.contains("grazie")) return "Prego! Posso fare altro?"
+        if (c.contains("cosa sai fare") || c.contains("aiuto")) return "Posso aprire impostazioni, Wi-Fi, Bluetooth e browser e dirti ora e data."
         val action = when {
             c.contains("impostazioni") -> Intent(Settings.ACTION_SETTINGS)
             c.contains("wifi") || c.contains("wi-fi") -> Intent(Settings.ACTION_WIFI_SETTINGS)
@@ -67,15 +90,36 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = getSharedPreferences("lira_voice", Context.MODE_PRIVATE)
+        voiceEnabled = prefs.getBoolean("enabled", true)
+        voiceRate = prefs.getFloat("rate", 1.0f)
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val result = tts?.setLanguage(Locale.ITALIAN)
+                ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+            }
+        }
         setContent {
             var command by remember { mutableStateOf("") }
             var response by remember { mutableStateOf("Sistema pronto. Puoi scrivere o dettare un comando.") }
             var selectedTab by remember { mutableStateOf(0) }
+            var voiceOn by remember { mutableStateOf(voiceEnabled) }
+            var rate by remember { mutableFloatStateOf(voiceRate) }
+            val history = remember { mutableStateListOf<Pair<String, String>>() }
+            fun submit(text: String) {
+                val answer = runCommand(text)
+                response = answer
+                if (text.isNotBlank()) {
+                    history.add(0, text.trim() to answer)
+                    if (history.size > 50) history.removeAt(history.lastIndex)
+                }
+                speak(answer)
+            }
             val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
                 if (!spoken.isNullOrBlank()) {
                     command = spoken
-                    response = runCommand(spoken)
+                    submit(spoken)
                 }
             }
             val pulse = rememberInfiniteTransition(label = "pulse")
@@ -97,13 +141,14 @@ class MainActivity : ComponentActivity() {
                             Text("L I R A", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = cyan)
                             Text("ASSISTENTE PERSONALE", fontSize = 10.sp, color = Color(0xFF9CB8CE))
                         }
-                        Text("● ONLINE", fontSize = 11.sp, color = Color(0xFF80E5C0))
+                        Text("● PRONTA", fontSize = 11.sp, color = Color(0xFF80E5C0))
                     }
                     Divider(color = Color(0xFF26415C))
                     Column(
                         Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        if (selectedTab == 0) {
                         Spacer(Modifier.height(18.dp))
                         Box(Modifier.size(190.dp), contentAlignment = Alignment.Center) {
                             Box(Modifier.size(178.dp).scale(scale).border(1.dp, cyan.copy(alpha = .35f), CircleShape))
@@ -135,7 +180,7 @@ class MainActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { response = runCommand(command) }, modifier = Modifier.weight(1f)) {
+                            Button(onClick = { submit(command) }, modifier = Modifier.weight(1f)) {
                                 Text("ESEGUI")
                             }
                             OutlinedButton(onClick = {
@@ -159,7 +204,7 @@ class MainActivity : ComponentActivity() {
                             Surface(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
                                     command = example
-                                    response = runCommand(example)
+                                    submit(example)
                                 },
                                 color = panel, shape = RoundedCornerShape(12.dp)
                             ) {
@@ -167,6 +212,46 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Spacer(Modifier.height(20.dp))
+                        } else if (selectedTab == 1) {
+                            Spacer(Modifier.height(24.dp))
+                            Text("CRONOLOGIA", color = cyan, fontSize = 18.sp)
+                            Spacer(Modifier.height(16.dp))
+                            if (history.isEmpty()) Text("Nessun comando in questa sessione.", color = Color.LightGray)
+                            history.forEach { (question, answer) ->
+                                Card(Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                    colors = CardDefaults.cardColors(containerColor = panel)) {
+                                    Column(Modifier.padding(14.dp)) {
+                                        Text(question, color = cyan, fontWeight = FontWeight.SemiBold)
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(answer, color = Color.White)
+                                    }
+                                }
+                            }
+                        } else {
+                            Spacer(Modifier.height(24.dp))
+                            Text("IMPOSTAZIONI VOCALI", color = cyan, fontSize = 18.sp)
+                            Spacer(Modifier.height(16.dp))
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Risposte parlate", modifier = Modifier.weight(1f), color = Color.White)
+                                Switch(checked = voiceOn, onCheckedChange = {
+                                    voiceOn = it
+                                    voiceEnabled = it
+                                    prefs.edit().putBoolean("enabled", it).apply()
+                                    if (!it) tts?.stop()
+                                })
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Text("Velocità della voce", color = Color.White)
+                            Slider(value = rate, onValueChange = {
+                                rate = it
+                                voiceRate = it
+                                prefs.edit().putFloat("rate", it).apply()
+                            }, valueRange = 0.7f..1.4f)
+                            OutlinedButton(onClick = { speak("Ciao, sono Lira. Questa è la mia voce.") }) {
+                                Text("PROVA VOCE")
+                            }
+                            Text("Voce italiana del motore Android installato.", color = Color.LightGray)
+                        }
                     }
                     Divider(color = Color(0xFF26415C))
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -174,11 +259,7 @@ class MainActivity : ComponentActivity() {
                             Text(label, color = if (selectedTab == index) cyan else Color(0xFF829BAF),
                                 fontSize = 11.sp, modifier = Modifier.clickable {
                                     selectedTab = index
-                                    when (index) {
-                                        0 -> response = "Sistema pronto."
-                                        1 -> response = "Le automazioni avanzate saranno disponibili nei prossimi aggiornamenti."
-                                        2 -> response = runCommand("apri impostazioni")
-                                    }
+
                                 }.padding(8.dp))
                         }
                     }

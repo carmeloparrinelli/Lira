@@ -1,6 +1,10 @@
 package com.carmeloparrinelli.lira
 
-import android.content.ActivityNotFoundException
+import android.Manifest
+import android.content.pm.PackageManager
+import android.speech.SpeechRecognizer
+import android.speech.RecognitionListener
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
@@ -41,6 +45,7 @@ private val navy = Color(0xFF070E1B)
 private val panel = Color(0xFF122338)
 
 class MainActivity : ComponentActivity() {
+    private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ready = false
     private var voiceEnabled = true
@@ -54,6 +59,8 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onDestroy() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
         tts?.stop()
         tts?.shutdown()
         super.onDestroy()
@@ -119,11 +126,50 @@ class MainActivity : ComponentActivity() {
                 }
                 speak(answer)
             }
-            val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-                if (!spoken.isNullOrBlank()) {
-                    command = spoken
-                    submit(spoken)
+            var listening by remember { mutableStateOf(false) }
+            val speechPermission = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                if (granted) {
+                    response = "Microfono autorizzato. Tocca nuovamente MICROFONO."
+                } else {
+                    response = "Per ascoltare serve il permesso del microfono."
+                }
+            }
+            DisposableEffect(Unit) {
+                if (SpeechRecognizer.isRecognitionAvailable(this@MainActivity)) {
+                    val recognizer = SpeechRecognizer.createSpeechRecognizer(this@MainActivity)
+                    speechRecognizer = recognizer
+                    recognizer.setRecognitionListener(object : RecognitionListener {
+                        override fun onReadyForSpeech(params: Bundle?) { listening = true }
+                        override fun onBeginningOfSpeech() { listening = true }
+                        override fun onRmsChanged(rmsdB: Float) {}
+                        override fun onBufferReceived(buffer: ByteArray?) {}
+                        override fun onEndOfSpeech() { listening = false }
+                        override fun onError(error: Int) {
+                            listening = false
+                            response = "Ascolto non riuscito (codice " + error + "). Riprova."
+                        }
+                        override fun onResults(results: Bundle?) {
+                            listening = false
+                            val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                            if (!spoken.isNullOrBlank()) {
+                                command = spoken
+                                submit(spoken)
+                            }
+                        }
+                        override fun onPartialResults(partialResults: Bundle?) {
+                            val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                            if (!partial.isNullOrBlank()) command = partial
+                        }
+                        override fun onEvent(eventType: Int, params: Bundle?) {}
+                    })
+                } else {
+                    response = "Riconoscimento vocale non disponibile."
+                }
+                onDispose {
+                    speechRecognizer?.destroy()
+                    speechRecognizer = null
                 }
             }
             val pulse = rememberInfiniteTransition(label = "pulse")
@@ -188,17 +234,24 @@ class MainActivity : ComponentActivity() {
                                 Text("ESEGUI")
                             }
                             OutlinedButton(onClick = {
-                                try {
-                                    recognizer.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                                    != PackageManager.PERMISSION_GRANTED) {
+                                    speechPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                } else if (listening) {
+                                    speechRecognizer?.stopListening()
+                                    listening = false
+                                } else {
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                         putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Parla con LIRA")
-                                    })
-                                } catch (_: ActivityNotFoundException) {
-                                    response = "Riconoscimento vocale non disponibile sul dispositivo."
+                                        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                                    }
+                                    speechRecognizer?.startListening(intent)
+                                    listening = true
+                                    response = "Ti ascolto..."
                                 }
                             }, modifier = Modifier.weight(1f)) {
-                                Text("MICROFONO")
+                                Text(if (listening) "FERMA" else "MICROFONO")
                             }
                         }
                         Spacer(Modifier.height(20.dp))

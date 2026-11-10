@@ -418,7 +418,7 @@ class MainActivity : ComponentActivity() {
                                 Text(if (offlineDownloading) "DOWNLOAD IN CORSO" else "SCARICA MODELLO AI")
                             }
                             if (offlineDownloading) LinearProgressIndicator(
-                                progress = { offlineDownloadProgress / 100f },
+                                progress = offlineDownloadProgress / 100f,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             OutlinedButton(onClick = {

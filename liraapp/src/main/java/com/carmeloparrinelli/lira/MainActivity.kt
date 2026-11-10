@@ -120,6 +120,10 @@ class MainActivity : ComponentActivity() {
             }
         }, selectedEngine)
         setContent {
+            var aiEnabled by remember { mutableStateOf(prefs.getBoolean("ai_enabled", false)) }
+            var aiEndpoint by remember { mutableStateOf(prefs.getString("ai_endpoint", "http://192.168.1.2:11434") ?: "") }
+            var aiModel by remember { mutableStateOf(prefs.getString("ai_model", "gemma3:1b") ?: "") }
+            var aiBusy by remember { mutableStateOf(false) }
             var command by remember { mutableStateOf("") }
             var response by remember { mutableStateOf("Sistema pronto. Puoi scrivere o dettare un comando.") }
             var selectedTab by remember { mutableStateOf(0) }

@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var voiceEnabled = true
     private var voiceRate = 1.05f
     private var voicePitch = 0.95f
+    private var selectedVoiceName: String? = null
     private fun speak(message: String) {
         if (voiceEnabled && ready) {
             tts?.setSpeechRate(voiceRate)
@@ -105,10 +106,12 @@ class MainActivity : ComponentActivity() {
         voiceEnabled = prefs.getBoolean("enabled", true)
         voiceRate = prefs.getFloat("rate", 1.05f)
         voicePitch = prefs.getFloat("pitch", 0.95f)
+        selectedVoiceName = prefs.getString("voice_name", null)
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale.ITALIAN)
                 ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+                selectedVoiceName?.let { name -> tts?.voices?.firstOrNull { it.name == name }?.let { tts?.voice = it } }
             }
         }
         setContent {
@@ -118,6 +121,14 @@ class MainActivity : ComponentActivity() {
             var voiceOn by remember { mutableStateOf(voiceEnabled) }
             var rate by remember { mutableFloatStateOf(voiceRate) }
             var pitch by remember { mutableFloatStateOf(voicePitch) }
+            var voiceName by remember { mutableStateOf(selectedVoiceName ?: "") }
+            var voiceMenu by remember { mutableStateOf(false) }
+            var voices by remember { mutableStateOf<List<android.speech.tts.Voice>>(emptyList()) }
+            LaunchedEffect(selectedTab) {
+                if (selectedTab == 2) {
+                    voices = tts?.voices?.filter { it.locale.language == "it" }?.sortedBy { it.name } ?: emptyList()
+                }
+            }
             val history = remember { mutableStateListOf<Pair<String, String>>() }
             LaunchedEffect(Unit) {
                 try {
@@ -327,6 +338,28 @@ class MainActivity : ComponentActivity() {
                                 voicePitch = it
                                 prefs.edit().putFloat("pitch", it).apply()
                             }, valueRange = 0.75f..1.25f)
+                            Spacer(Modifier.height(12.dp))
+                            Text("Seleziona voce italiana", color = Color.White)
+                            Box {
+                                OutlinedButton(onClick = { voiceMenu = true }) {
+                                    Text(if (voiceName.isBlank()) "Voce predefinita" else voiceName.take(32))
+                                }
+                                DropdownMenu(expanded = voiceMenu, onDismissRequest = { voiceMenu = false }) {
+                                    voices.forEach { v ->
+                                        DropdownMenuItem(
+                                            text = { Text(v.name + if (v.isNetworkConnectionRequired) " (online)" else " (offline)") },
+                                            onClick = {
+                                                voiceMenu = false
+                                                voiceName = v.name
+                                                selectedVoiceName = v.name
+                                                prefs.edit().putString("voice_name", v.name).apply()
+                                                tts?.voice = v
+                                                speak("Ciao, sono Lira. Questa è la mia voce.")
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                             OutlinedButton(onClick = { speak("Ciao, sono Lira. Questa è la mia voce.") }) {
                                 Text("PROVA VOCE")
                             }

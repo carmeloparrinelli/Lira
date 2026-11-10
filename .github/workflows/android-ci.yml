@@ -37,11 +37,11 @@ jobs:
         with:
           gradle-version: '8.2.1'
       - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :liraapp:assembleDebug
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Lira-debug-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/*.apk
+          path: liraapp/build/outputs/apk/debug/*.apk
           if-no-files-found: error

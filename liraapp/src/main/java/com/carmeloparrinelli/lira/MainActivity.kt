@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                         }
                         Text("● ONLINE", fontSize = 11.sp, color = Color(0xFF80E5C0))
                     }
-                    HorizontalDivider(color = Color(0xFF26415C))
+                    Divider(color = Color(0xFF26415C))
                     Column(
                         Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.height(20.dp))
                     }
-                    HorizontalDivider(color = Color(0xFF26415C))
+                    Divider(color = Color(0xFF26415C))
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                         listOf("HOME", "ATTIVITÀ", "IMPOSTAZIONI").forEachIndexed { index, label ->
                             Text(label, color = if (selectedTab == index) cyan else Color(0xFF829BAF),

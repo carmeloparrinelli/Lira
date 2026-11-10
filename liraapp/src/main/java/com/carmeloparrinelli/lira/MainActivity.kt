@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val cyan = Color(0xFF64D9FF)
 private val navy = Color(0xFF070E1B)
@@ -117,12 +119,26 @@ class MainActivity : ComponentActivity() {
             var rate by remember { mutableFloatStateOf(voiceRate) }
             var pitch by remember { mutableFloatStateOf(voicePitch) }
             val history = remember { mutableStateListOf<Pair<String, String>>() }
+            LaunchedEffect(Unit) {
+                try {
+                    val saved = JSONArray(prefs.getString("history", "[]"))
+                    for (i in 0 until saved.length()) {
+                        val item = saved.getJSONObject(i)
+                        history.add(item.optString("question") to item.optString("answer"))
+                    }
+                } catch (_: Exception) {}
+            }
             fun submit(text: String) {
                 val answer = runCommand(text)
                 response = answer
                 if (text.isNotBlank()) {
                     history.add(0, text.trim() to answer)
                     if (history.size > 50) history.removeAt(history.lastIndex)
+                    val saved = JSONArray()
+                    history.forEach { (q, a) ->
+                        saved.put(JSONObject().put("question", q).put("answer", a))
+                    }
+                    prefs.edit().putString("history", saved.toString()).apply()
                 }
                 speak(answer)
             }

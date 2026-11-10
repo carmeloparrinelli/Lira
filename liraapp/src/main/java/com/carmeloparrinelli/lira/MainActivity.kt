@@ -344,6 +344,13 @@ class MainActivity : ComponentActivity() {
                                 prefs.edit().putFloat("pitch", it).apply()
                             }, valueRange = 0.75f..1.25f)
                             Spacer(Modifier.height(12.dp))
+                            Text("VOCE NEURALE OFFLINE", color = cyan, fontWeight = FontWeight.Bold)
+                            Text("Per sostituire davvero la voce Google, installa il motore Sherpa ONNX con la voce italiana Paola Medium. Dopo l'installazione, riapri LIRA e seleziona il motore qui sotto.", color = Color.White, fontSize = 13.sp)
+                            OutlinedButton(onClick = {
+                                startActivity(Intent(Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://k2-fsa.github.io/sherpa/onnx/tts/all/Italian/vits-piper-it_IT-paola-medium.html")))
+                            }) { Text("SCARICA VOCE NEURALE ITALIANA") }
+                            Spacer(Modifier.height(12.dp))
                             Text("Motore vocale Android", color = Color.White)
                             Box {
                                 OutlinedButton(onClick = { engineMenu = true }) {

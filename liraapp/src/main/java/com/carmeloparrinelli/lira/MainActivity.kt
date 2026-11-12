@@ -7,6 +7,7 @@ import android.speech.RecognitionListener
 import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.os.Bundle
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.TextToSpeech
 import android.content.Context
 import android.provider.Settings
@@ -51,12 +52,26 @@ class MainActivity : ComponentActivity() {
     private lateinit var onDeviceAi: OnDeviceAi
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
+    private var isSpeaking by mutableStateOf(false)
     private var ready = false
     private var voiceEnabled = true
     private var voiceRate = 1.05f
     private var voicePitch = 0.95f
     private var selectedVoiceName: String? = null
     private var selectedEngine: String? = null
+    private fun attachSpeechAnimation() {
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                runOnUiThread { isSpeaking = true }
+            }
+            override fun onDone(utteranceId: String?) {
+                runOnUiThread { isSpeaking = false }
+            }
+            override fun onError(utteranceId: String?) {
+                runOnUiThread { isSpeaking = false }
+            }
+        })
+    }
     private fun speak(message: String) {
         if (voiceEnabled && ready) {
             tts?.setSpeechRate(voiceRate)
@@ -120,6 +135,7 @@ class MainActivity : ComponentActivity() {
                 val result = tts?.setLanguage(Locale.ITALIAN)
                 ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
                 selectedVoiceName?.let { name -> tts?.voices?.firstOrNull { it.name == name }?.let { tts?.voice = it } }
+                attachSpeechAnimation()
             }
         }, selectedEngine)
         setContent {
@@ -512,6 +528,7 @@ class MainActivity : ComponentActivity() {
                                                 if (status == TextToSpeech.SUCCESS) {
                                                     val result = tts?.setLanguage(Locale.ITALIAN)
                                                     ready = result != null && result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+                                                    attachSpeechAnimation()
                                                 }
                                             }, engine.name)
                                         })

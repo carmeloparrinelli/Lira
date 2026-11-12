@@ -292,9 +292,21 @@ class MainActivity : ComponentActivity() {
             }
             val pulse = rememberInfiniteTransition(label = "pulse")
             val scale by pulse.animateFloat(
-                initialValue = 0.94f, targetValue = 1.06f,
-                animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                label = "core"
+                initialValue = if (isSpeaking) 0.94f else 0.985f,
+                targetValue = if (isSpeaking) 1.09f else 1.015f,
+                animationSpec = infiniteRepeatable(
+                    tween(if (isSpeaking) 450 else 2100, easing = FastOutSlowInEasing),
+                    RepeatMode.Reverse
+                ),
+                label = "voiceCore"
+            )
+            val ringScale by pulse.animateFloat(
+                initialValue = 0.94f, targetValue = if (isSpeaking) 1.16f else 1.035f,
+                animationSpec = infiniteRepeatable(
+                    tween(if (isSpeaking) 700 else 2400, easing = FastOutSlowInEasing),
+                    RepeatMode.Reverse
+                ),
+                label = "voiceRing"
             )
             MaterialTheme(colorScheme = darkColorScheme(primary = cyan, background = navy, surface = panel)) {
                 Column(
@@ -309,7 +321,7 @@ class MainActivity : ComponentActivity() {
                             Text("L I R A", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = cyan)
                             Text("ASSISTENTE PERSONALE", fontSize = 10.sp, color = Color(0xFF9CB8CE))
                         }
-                        Text("● PRONTA", fontSize = 11.sp, color = Color(0xFF80E5C0))
+                        Text(if (isSpeaking) "● PARLO" else if (listening) "● ASCOLTO" else if (aiBusy) "● ELABORO" else "● PRONTA", fontSize = 11.sp, color = if (isSpeaking) cyan else Color(0xFF80E5C0))
                     }
                     Divider(color = Color(0xFF26415C))
                     Column(
@@ -318,16 +330,30 @@ class MainActivity : ComponentActivity() {
                     ) {
                         if (selectedTab == 0) {
                         Spacer(Modifier.height(18.dp))
-                        Box(Modifier.size(190.dp), contentAlignment = Alignment.Center) {
-                            Box(Modifier.size(178.dp).scale(scale).border(1.dp, cyan.copy(alpha = .35f), CircleShape))
-                            Box(Modifier.size(145.dp).border(2.dp, cyan.copy(alpha = .7f), CircleShape))
-                            Box(Modifier.size(116.dp).background(
-                                Brush.radialGradient(listOf(Color(0xFF2D9DCA), Color(0xFF102C50), navy)),
-                                CircleShape
+                        Box(Modifier.size(216.dp), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(204.dp).scale(ringScale).border(
+                                if (isSpeaking) 2.dp else 1.dp,
+                                cyan.copy(alpha = if (isSpeaking) .75f else .25f), CircleShape
+                            ))
+                            Box(Modifier.size(174.dp).scale(scale).border(
+                                2.dp, cyan.copy(alpha = if (isSpeaking) .95f else .48f), CircleShape
+                            ))
+                            Box(Modifier.size(144.dp).scale(scale).background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        if (isSpeaking) Color(0xFF66DDFB) else Color(0xFF237FA8),
+                                        Color(0xFF163B63), navy
+                                    )
+                                ), CircleShape
                             ).border(2.dp, cyan, CircleShape))
-                            Text("L", fontSize = 58.sp, fontWeight = FontWeight.Light, color = Color.White)
+                            Text(if (isSpeaking) "◉" else "L", fontSize = if (isSpeaking) 62.sp else 58.sp,
+                                fontWeight = FontWeight.Light, color = Color.White)
                         }
-                        Text("PRONTA AD ASCOLTARTI", color = cyan, fontSize = 13.sp, letterSpacing = 2.sp)
+                        Text(
+                            if (isSpeaking) "LIRA STA PARLANDO" else if (listening) "TI STO ASCOLTANDO"
+                            else if (aiBusy) "STO ELABORANDO" else "PRONTA AD ASCOLTARTI",
+                            color = cyan, fontSize = 13.sp, letterSpacing = 1.5.sp
+                        )
                         Spacer(Modifier.height(18.dp))
                         Card(colors = CardDefaults.cardColors(containerColor = panel),
                             border = BorderStroke(1.dp, Color(0xFF2A4A66)),

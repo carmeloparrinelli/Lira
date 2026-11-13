@@ -1,0 +1,42 @@
+name: Audit Actions storage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inventory all artifacts and identify cleanup candidates
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {owner, repo, per_page: 100});
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {owner, repo, per_page: 100});
+            const cutoff = Date.now() - 7 * 86400000;
+            const success = runs.filter(r => r.conclusion === 'success' && r.name !== 'Weekly Actions storage cleanup' && r.name !== 'Audit Actions storage').sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
+            const protectedIds = new Set(success.slice(0,3).map(r => r.id));
+            const old = artifacts.filter(a => !a.expired && !protectedIds.has(a.workflow_run?.id) && new Date(a.created_at).getTime() < cutoff);
+            const recent = artifacts.filter(a => !a.expired && new Date(a.created_at).getTime() >= cutoff);
+            const protectedArtifacts = artifacts.filter(a => !a.expired && protectedIds.has(a.workflow_run?.id));
+            const failed = runs.filter(r => ['failure','cancelled'].includes(r.conclusion) && new Date(r.created_at).getTime() < cutoff);
+            const mib = a => (a.reduce((n,x) => n+(x.size_in_bytes||0),0)/1048576).toFixed(2);
+            core.info(`TOTAL artifacts: ${artifacts.length}, ${mib(artifacts)} MiB`);
+            core.info(`OLDER THAN 7 DAYS and not protected: ${old.length}, ${mib(old)} MiB`);
+            core.info(`RECENT artifacts: ${recent.length}, ${mib(recent)} MiB`);
+            core.info(`PROTECTED last 3 build runs: ${protectedArtifacts.length}, ${mib(protectedArtifacts)} MiB`);
+            core.info(`FAILED/CANCELLED old runs: ${failed.length}`);
+            for (const a of artifacts.slice(0,100)) core.info(`ARTIFACT id=${a.id} name=${a.name} sizeMiB=${((a.size_in_bytes||0)/1048576).toFixed(2)} run=${a.workflow_run?.id||'unknown'} created=${a.created_at} expired=${a.expired}`);
+            await core.summary.addHeading('Actions artifact inventory').addTable([
+              [{data:'Category',header:true},{data:'Count',header:true},{data:'Size (MiB)',header:true}],
+              ['All artifacts',String(artifacts.length),mib(artifacts)],
+              ['Old and not protected',String(old.length),mib(old)],
+              ['Recent (last 7 days)',String(recent.length),mib(recent)],
+              ['Protected latest 3 builds',String(protectedArtifacts.length),mib(protectedArtifacts)],
+              ['Old failed/cancelled runs',String(failed.length),'—']
+            ]).addRaw('Read-only audit. No artifacts or runs were deleted.').write();
